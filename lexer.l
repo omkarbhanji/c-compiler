@@ -13,20 +13,19 @@ unary "++"|"--"
 [ \t]+      ;  
 "main"                                  { return MAIN; }
 "int"                                   { return INT; }
-"float"                                   { return FLOAT; }
-"char"                                   { return CHAR; }
+"float"                                 { return FLOAT; }
+"char"                                  { return CHAR; }
 "void"                                  { return VOID; }
 "printf"                                { return PRINTF; }
 "scanf"                                 { return SCANF; }
 "if"                                    { return IF; }
-"else"                                    { return ELSE; }
+"else"                                  { return ELSE; }
 "for"                                   {  return FOR; }
-"true"                                   {  return TRUE; }
-"false"                                   {  return FALSE; }
+"true"                                  {  return TRUE; }
+"false"                                 {  return FALSE; }
 "return"                                { return RETURN; }
-{alpha}({alpha}|{digit})*                  { return IDENTIFIER; }
+{alpha}({alpha}|{digit})*               { return IDENTIFIER; }
 ["].*["]                                { return STRING; }
-
 ^"#include"[ ]*<.+\.h>                  { return INCLUDE; }
 "("                                     { return OPEN_PARENTHESES; }
 ")"                                     { return CLOSE_PARENTHESES; }

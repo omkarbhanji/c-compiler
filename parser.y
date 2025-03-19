@@ -4,22 +4,23 @@
 #include <string.h>
 
 extern char *yytext; // Declare yytext from Flex
- int yylex(); 
+extern FILE *yyin;
+int yylex(); 
 void yyerror(const char *s);
-
-
-
 
 void add(char c);
 void insert_type();
-
-
+void printST();
 
 struct symbolTableEntry {
     char* identifierName;
     char* identifierType;
     int lineNumber;
-} symbolTable[40];
+
+    struct symbolTableEntry *next;
+};
+
+struct symbolTableEntry *symbolTable = NULL;
 
 int count = 0;
 char type[10];
@@ -32,58 +33,65 @@ char type[10];
 
 %%
 
-code: headers datatype MAIN OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY { printf("Correct code!\n");  add('F');   }
+code: headers datatype MAIN { add('F'); } OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY { printf("Correct code!\n"); }
     ;
 
-headers: headers INCLUDE { add('H'); }
-        | INCLUDE { add('H'); }
+headers: INCLUDE { add('H'); }
+       | headers INCLUDE { add('H'); }
+       ;
+
+datatype: INT { strcpy(type, "int"); }
+        | FLOAT { strcpy(type, "float"); }
+        | CHAR { strcpy(type, "char"); }
+        | VOID { strcpy(type, "void"); }
         ;
 
-datatype: INT { insert_type(); }
-        | FLOAT { insert_type(); }
-        | CHAR { insert_type(); }
-        | VOID { insert_type(); }
-        ;
 
-value: NUMBER
-     | FLOAT_NUM
-     | CHARACTER
-     | IDENTIFIER
+value: NUMBER { add('C'); }
+     | FLOAT_NUM { add('C'); }
+     | CHARACTER { add('C'); }
+     | IDENTIFIER { printf("DEBUG: Adding variable %s with type %s\n", yytext, type);
+ add('V'); }  // Change from 'C' to 'V'
      ;
 
-body: PRINTF OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
-    | SCANF OPEN_PARENTHESES STRING COMMA AMPERSEND IDENTIFIER CLOSE_PARENTHESES SEMICOLON
-    | IF OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY else
-    | FOR OPEN_PARENTHESES statement SEMICOLON condition SEMICOLON statement CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY 
+
+
+body: PRINTF  { add('K'); } OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
+    | SCANF  { add('K'); } OPEN_PARENTHESES STRING COMMA AMPERSEND IDENTIFIER CLOSE_PARENTHESES SEMICOLON
+    | IF  { add('K'); } OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY else
+    | FOR  { add('K'); } OPEN_PARENTHESES statement SEMICOLON condition SEMICOLON statement CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY 
+    | RETURN { add('K'); } value SEMICOLON  // Fix: Ensure RETURN IS Seperated
     | statement SEMICOLON
-    |
     ;
 
-else: ELSE OPEN_CURLY body CLOSE_CURLY
-    |
+
+
+else: ELSE  { add('K'); } OPEN_CURLY body CLOSE_CURLY
+    | /* empty */
     ;
 
-statement: datatype IDENTIFIER init { add('V'); }
+statement: datatype IDENTIFIER init { insert_type(); add('V'); }
          | IDENTIFIER ASSIGN expression
          | IDENTIFIER relation_op expression
          | IDENTIFIER UNARY
          | UNARY IDENTIFIER
-         |
          ;
 
+
+
 init: ASSIGN value
-    |
+    | /* empty */
     ;
 
 condition: value relation_op value
-         | TRUE
-         | FALSE
-         |
+         | TRUE { add('K'); }
+         | FALSE { add('K'); }
+         | /* empty */
          ;
 
-expression: expression arithmetic_op expression
-          | value
-          ; 
+expression: value
+          | expression arithmetic_op value  // Right recursion for better parsing
+          ;
 
 arithmetic_op: ADD  
              | SUBTRACT
@@ -99,89 +107,100 @@ relation_op: LT
             | NE
             ;
 
-return_stmt: RETURN value SEMICOLON ;
+
+return_stmt: RETURN  { add('K'); }  value SEMICOLON ;
 
        ;
 %%
 
 int main() {
 
-    
+    yyin = fopen("input.txt", "r");
+    if (!yyin) {
+        perror("Error opening file");
+        return 1;
+    }
 
 
     yyparse();
-
-    showSymbolTable();
-    for (int i = 0; i < count; i++) {
-    free(symbolTable[i].identifierName);
-    free(symbolTable[i].identifierType);
-}
-
-
+    printST();
+    fclose(yyin);
     return 0;
 }
 
-void showSymbolTable(){
-printf("\n\n");
-	printf("\t\t\t\t\t\t\t\t PHASE 1: LEXICAL ANALYSIS \n\n");
-	printf("\nSYMBOL   DATATYPE    LINE NUMBER \n");
-	printf("_______________________________________\n\n");
-	
-	for(int i=0; i<count; i++) {
-		printf("%s\t%s\t%d\t\n", symbolTable[i].identifierName, symbolTable[i].identifierType, symbolTable[i].lineNumber);
 
-	}
-}
 void add(char c) {
-   printf("Adding to symbol table: %s (Type: %s) at index %d\n", yytext, type, count);
+
+    struct symbolTableEntry *n = (struct symbolTableEntry *)malloc(sizeof(struct symbolTableEntry));
 
     if (c == 'H') {
-        symbolTable[count].identifierName = strdup(yytext);
-        symbolTable[count].identifierType = strdup(type);
-        symbolTable[count].lineNumber = count; // Assuming countn is a placeholder
-   
+        n->identifierName = strdup(yytext);
+        n->identifierType = strdup("header");
+        n->lineNumber = count; // Assuming countn is a placeholder
         count++;
     }
     else if (c == 'K') {
-        symbolTable[count].identifierName = strdup(yytext);
-        symbolTable[count].identifierType = strdup("N/A");
-        symbolTable[count].lineNumber = count;
-       
+        n->identifierName = strdup(yytext);
+        n->identifierType = strdup("N/A");
+        n->lineNumber = count; // Assuming countn is a placeholder
+    
         count++;
     }
     else if (c == 'V') {
-        symbolTable[count].identifierName = strdup(yytext);
-        symbolTable[count].identifierType = strdup(type);
-        symbolTable[count].lineNumber = count;
-       
+
+        n->identifierName = strdup(yytext);
+        n->identifierType = strdup(type);
+        n->lineNumber = count; // Assuming countn is a placeholder
+
         count++;
     }
     else if (c == 'C') {
-        symbolTable[count].identifierName = strdup(yytext);
-        symbolTable[count].identifierType = strdup("CONST");
-        symbolTable[count].lineNumber = count;
+
+        n->identifierName = strdup(yytext);
+        n->identifierType = strdup("CONST");
+        n->lineNumber = count; // Assuming countn is a placeholder
        
         count++;
     }
     else if (c == 'F') {
-        symbolTable[count].identifierName = strdup(yytext);
-        symbolTable[count].identifierType = strdup(type);
-        symbolTable[count].lineNumber = count;
+
+        n->identifierName = strdup(yytext);
+        n->identifierType = strdup(type);
+        n->lineNumber = count; // Assuming countn is a placeholder
         
         count++;
     }
+
+    n->next = symbolTable;
+    symbolTable = n;
 }
 
-int search(char *type) {
-	int i;
-	for(i=count-1; i>=0; i--) {
-		if(strcmp(symbolTable[i].identifierName, type)==0) {
-			return -1;
-			break;
-		}
-	}
-	return 0;
+
+void printST() {
+    struct symbolTableEntry *temp = symbolTable;
+
+    if (temp == NULL) {
+        printf("Symbol table is empty.\n");
+        return;
+    }
+
+    // Print table header
+    printf("\nPHASE 1: LEXICAL ANALYSIS \n\n");
+    printf("+----------------------+----------------------+--------------+\n");
+    printf("| %-20s | %-20s | %-12s |\n", "SYMBOL", "DATATYPE", "LINE NUMBER");
+    printf("+----------------------+----------------------+--------------+\n");
+
+    // Print table contents
+    while (temp != NULL) {
+        printf("| %-20s | %-20s | %-12d |\n", temp->identifierName, temp->identifierType, temp->lineNumber);
+        temp = temp->next;
+    }
+
+    // Print table footer
+    printf("+----------------------+----------------------+--------------+\n");
 }
+
+
 
 void insert_type() {
     strcpy(type, yytext);
