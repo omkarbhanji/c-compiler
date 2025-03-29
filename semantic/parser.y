@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern char *yytext; // Declare yytext from Flex
+extern char *yytext; 
 extern FILE *yyin;
 int yylex(); 
 void yyerror(const char *s);
@@ -49,14 +49,15 @@ extern int lineNumber;
     }ndObj2;
 }
 %token VOID
-%token <ndObj> MAIN INT FLOAT CHAR  RETURN INCLUDE OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY CLOSE_CURLY SEMICOLON NUMBER FLOAT_NUM CHARACTER STRING PRINTF
-%token <ndObj> COMMA AMPERSEND SCANF IF ELSE FOR IDENTIFIER ASSIGN LE GE EQ NE LT GT AND OR ADD SUBTRACT MULTIPLY DIVIDE TRUE FALSE UNARY
+%token <ndObj> MAIN INT FLOAT CHAR  RETURN INCLUDE OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY CLOSE_CURLY SEMICOLON COLON NUMBER FLOAT_NUM CHARACTER STRING PRINTF
+%token <ndObj> COMMA AMPERSEND SCANF IF ELSE FOR DO WHILE SWITCH CASE BREAK DEFAULT IDENTIFIER  ASSIGN LE GE EQ NE LT GT AND OR ADD SUBTRACT MULTIPLY DIVIDE TRUE FALSE UNARY LINE
+ 
 
-%type <ndObj2> value
+%type <ndObj2> value  
 
 %%
 
-program: headers datatype MAIN { addSymbol('F'); }OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY { printf("Correct code!\n"); }
+program: headers datatype MAIN { addSymbol('F'); }OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY 
     ;
 
 headers: headers INCLUDE { addSymbol('H'); }
@@ -73,30 +74,45 @@ datatype: INT { insertDataType(); }
 body: code_list
     ;
 
-code_list: 
-         | code_list code
+code_list: code_list code
+         | 
          ;
 
 
 code : PRINTF OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
       | IF OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY else
       | FOR OPEN_PARENTHESES for_initialization SEMICOLON condition SEMICOLON inc_dec CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
+      | WHILE OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
+      | DO OPEN_CURLY code_list CLOSE_CURLY WHILE OPEN_PARENTHESES condition CLOSE_PARENTHESES SEMICOLON
+      | SWITCH OPEN_PARENTHESES IDENTIFIER { checkDeclaration($3.name); } CLOSE_PARENTHESES OPEN_CURLY switch_body switch_default CLOSE_CURLY
       | statement SEMICOLON
       ;
 
 for_initialization : datatype IDENTIFIER {addSymbol('V'); } init
-                    | IDENTIFIER init
+                    | IDENTIFIER { checkDeclaration($1.name); } init
                     ;
 
-inc_dec : IDENTIFIER UNARY
-        | UNARY IDENTIFIER  
+switch_body : CASE value COLON code_list break SEMICOLON switch_body
+            | 
+            ;
+
+break : BREAK
+      | 
+      ;
+
+switch_default : DEFAULT COLON code_list
+                |
+                ;
+
+inc_dec : IDENTIFIER { checkDeclaration($1.name); } UNARY
+        | UNARY IDENTIFIER { checkDeclaration($2.name); }
         ;
 
 statement : datatype IDENTIFIER {addSymbol('V'); } init 
-          | IDENTIFIER { checkDeclaration($1.name) } ASSIGN expression 
-          | IDENTIFIER { checkDeclaration($1.name) } UNARY
-          | UNARY IDENTIFIER { checkDeclaration($2.name) }
-          | IDENTIFIER { checkDeclaration($1.name) } relation_op expression
+          | IDENTIFIER { checkDeclaration($1.name); } ASSIGN expression 
+          | IDENTIFIER { checkDeclaration($1.name); } UNARY
+          | UNARY IDENTIFIER { checkDeclaration($2.name); }
+          | IDENTIFIER { checkDeclaration($1.name); } relation_op expression
           ;
 
 init: ASSIGN value
@@ -108,17 +124,17 @@ else : ELSE  OPEN_CURLY code_list CLOSE_CURLY
      ; 
 
 condition : value relation_op value 
-          | IDENTIFIER relation_op value
-          | value relation_op IDENTIFIER
-          | IDENTIFIER relation_op IDENTIFIER
+          | IDENTIFIER relation_op value { checkDeclaration($1.name); }
+          | value relation_op IDENTIFIER { checkDeclaration($3.name); }
+          | IDENTIFIER relation_op IDENTIFIER { checkDeclaration($1.name); checkDeclaration($3.name); }
           | TRUE  
           | FALSE  
           ;
 
 expression : value arithmetic_op expression
-           | IDENTIFIER arithmetic_op expression
+           | IDENTIFIER { checkDeclaration($1.name); } arithmetic_op expression
            | value
-           | IDENTIFIER
+           | IDENTIFIER { checkDeclaration($1.name); }
            ;
 
 return_stmt : RETURN value SEMICOLON { checkReturnType($2.name, $2.type); }
@@ -155,14 +171,14 @@ int main() {
 
     yyparse();
     printST();
-
+    printf("\n\n\t\t\tSEMANTIC ANALYSIS\n\n");
     if(errorCount > 0){
         printf("\n\nSemantic analysis completed with %d errors\n", errorCount);
         for(int i=0; i<errorCount; i++){
 			printf(" - %s", errors[i]);
 		}
     }else{
-        printf("Semantic analysis completed with no errors");
+        printf("\nSemantic analysis completed with no errors");
     }
     fclose(yyin);
     return 0;
@@ -232,7 +248,8 @@ void printST() {
     }
 
     // Print table header
-    printf("\nPHASE 1: LEXICAL ANALYSIS \n\n");
+    printf("\n\t\t\t\tLEXICAL ANALYSIS\n\n");
+    printf("\nSymbol Table\n");
     printf("+----------------------+----------------------+----------------------+--------------+\n");
     printf("| %-20s | %-20s | %-20s | %-12s |\n", "SYMBOL","TYPE", "DATATYPE", "LINE NUMBER");
     printf("+----------------------+----------------------+----------------------+--------------+\n");
@@ -268,6 +285,8 @@ void checkReturnType(char *val, char *type){
         sprintf(errors[errorCount++], "Line %d. Return type mismatch.\n", lineNumber);
     }
 }
+
+ 
 
 char *getDataType(char *var){
     struct symbolTableEntry *n = symbolTable;

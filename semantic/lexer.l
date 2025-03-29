@@ -24,6 +24,12 @@ unary "++"|"--"
 "if"                                    { strcpy(yylval.ndObj.name, (yytext)); return IF; }
 "else"                                  { strcpy(yylval.ndObj.name, (yytext)); return ELSE; }
 "for"                                   { strcpy(yylval.ndObj.name, (yytext)); return FOR; }
+"do"                                    { strcpy(yylval.ndObj.name, (yytext)); return DO; }
+"while"                                 { strcpy(yylval.ndObj.name, (yytext)); return WHILE; }
+"switch"                                { strcpy(yylval.ndObj.name, (yytext)); return SWITCH; }
+"case"                                  { strcpy(yylval.ndObj.name, (yytext)); return CASE; }
+"break"                                 { strcpy(yylval.ndObj.name, (yytext)); return BREAK; }
+"default"                               { strcpy(yylval.ndObj.name, (yytext)); return DEFAULT; }
 "true"                                  { strcpy(yylval.ndObj.name, (yytext)); return TRUE; }
 "false"                                 { strcpy(yylval.ndObj.name, (yytext)); return FALSE; }
 "return"                                { strcpy(yylval.ndObj.name, (yytext)); return RETURN; }
@@ -35,6 +41,7 @@ unary "++"|"--"
 "{"                                     { strcpy(yylval.ndObj.name, (yytext)); return OPEN_CURLY; }
 "}"                                     { strcpy(yylval.ndObj.name, (yytext)); return CLOSE_CURLY; }
 ";"                                     { strcpy(yylval.ndObj.name, (yytext)); return SEMICOLON; }
+":"                                     { strcpy(yylval.ndObj.name, (yytext)); return COLON; }
 ","                                     { strcpy(yylval.ndObj.name, (yytext)); return COMMA; }
 "="                                     { strcpy(yylval.ndObj.name, (yytext)); return ASSIGN; }
 "&"                                     { strcpy(yylval.ndObj.name, (yytext)); return AMPERSEND; }
@@ -52,7 +59,7 @@ unary "++"|"--"
 "*"                         { strcpy(yylval.ndObj.name, (yytext)); return MULTIPLY; }
 "++"                        { strcpy(yylval.ndObj.name, (yytext)); return UNARY; }
 "--"                        { strcpy(yylval.ndObj.name, (yytext)); return UNARY; }
-[\n]                        { lineNumber++; }
+[\n]                        { lineNumber++;}
 [-]?[0-9]+                              { strcpy(yylval.ndObj.name, (yytext)); return NUMBER; }
 [-]?[0-9]+\.[0-9]{1,6}                  { strcpy(yylval.ndObj.name, (yytext)); return FLOAT_NUM; }
 ['].[']                                 { strcpy(yylval.ndObj.name, (yytext)); return CHARACTER; }
