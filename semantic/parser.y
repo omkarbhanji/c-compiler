@@ -79,7 +79,7 @@ code_list: code_list code
          ;
 
 
-code : PRINTF OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
+code : PRINTF OPEN_PARENTHESES STRING printf_param CLOSE_PARENTHESES SEMICOLON
       | IF OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY else
       | FOR OPEN_PARENTHESES for_initialization SEMICOLON condition SEMICOLON inc_dec CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
       | WHILE OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
@@ -88,19 +88,23 @@ code : PRINTF OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
       | statement SEMICOLON
       ;
 
+printf_param : COMMA IDENTIFIER printf_param { checkDeclaration($2.name); }
+             |
+             ;
+
 for_initialization : datatype IDENTIFIER {addSymbol('V'); } init
                     | IDENTIFIER { checkDeclaration($1.name); } init
                     ;
 
-switch_body : CASE value COLON code_list break SEMICOLON switch_body
+switch_body : CASE value COLON code_list break switch_body
             | 
             ;
 
-break : BREAK
+break : BREAK SEMICOLON
       | 
       ;
 
-switch_default : DEFAULT COLON code_list
+switch_default : DEFAULT COLON code_list break
                 |
                 ;
 
