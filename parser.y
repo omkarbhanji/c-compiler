@@ -3,19 +3,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern char *yytext; // Declare yytext from Flex
+extern char *yytext; 
 extern FILE *yyin;
 int yylex(); 
 void yyerror(const char *s);
 
-void add(char c);
-void insert_type();
+void addSymbol(char c);
+void insertDataType();
 void printST();
+void checkDeclaration(char *var);
+void checkReturnType(char *val, char *type);
+char *getDataType(char *var);
+
 
 struct symbolTableEntry {
     char* identifierName;
     char* identifierType;
-    int lineNumber;
+    char* dataType;
+    int lineNum;
 
     struct symbolTableEntry *next;
 };
@@ -24,157 +29,226 @@ struct symbolTableEntry *symbolTable = NULL;
 
 int count = 0;
 char type[10];
+char errors[20][50];
+int errorCount = 0;
+
+extern int lineNumber;
+
+extern char c;
+extern void printTokens();
 
 %}
 
-%token MAIN INT FLOAT CHAR VOID RETURN INCLUDE OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY CLOSE_CURLY SEMICOLON NUMBER FLOAT_NUM CHARACTER STRING PRINTF
-%token COMMA AMPERSEND SCANF IF ELSE FOR IDENTIFIER ASSIGN LE GE EQ NE LT GT AND OR ADD SUBTRACT MULTIPLY DIVIDE TRUE FALSE UNARY
+%union {
+    struct varName{
+        char name[50];
+        struct node *nd;
+    }ndObj;
 
+    struct varName2{
+        char name[50];
+        struct node *nd;
+        char type[5];
+    }ndObj2;
+}
+
+%token VOID
+%token <ndObj> MAIN INT FLOAT CHAR  RETURN INCLUDE OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY CLOSE_CURLY SEMICOLON COLON NUMBER FLOAT_NUM CHARACTER STRING PRINTF
+%token <ndObj> COMMA AMPERSEND SCANF IF ELSE FOR DO WHILE SWITCH CASE BREAK DEFAULT IDENTIFIER  ASSIGN LE GE EQ NE LT GT AND OR ADD SUBTRACT MULTIPLY DIVIDE TRUE FALSE UNARY LINE
+ 
+
+%type <ndObj2> value  
 
 %%
 
-code: headers datatype MAIN { add('F'); } OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY { printf("Correct code!\n"); }
+program: headers datatype MAIN { addSymbol('F'); }OPEN_PARENTHESES CLOSE_PARENTHESES OPEN_CURLY body return_stmt CLOSE_CURLY 
     ;
 
-headers: INCLUDE { add('H'); }
-       | headers INCLUDE { add('H'); }
+headers: headers INCLUDE { addSymbol('H'); }
+       | INCLUDE { addSymbol('H'); }
        ;
 
-datatype: INT { strcpy(type, "int"); }
-        | FLOAT { strcpy(type, "float"); }
-        | CHAR { strcpy(type, "char"); }
-        | VOID { strcpy(type, "void"); }
+
+datatype: INT { insertDataType(); }
+        | FLOAT { insertDataType(); }
+        | CHAR { insertDataType(); }
+        | VOID { insertDataType(); }
         ;
 
-
-value: NUMBER { add('C'); }
-     | FLOAT_NUM { add('C'); }
-     | CHARACTER { add('C'); }
-     | IDENTIFIER { printf("DEBUG: Adding variable %s with type %s\n", yytext, type);
- add('V'); }  // Change from 'C' to 'V'
-     ;
-
-
-
-body: PRINTF  { add('K'); } OPEN_PARENTHESES STRING CLOSE_PARENTHESES SEMICOLON
-    | SCANF  { add('K'); } OPEN_PARENTHESES STRING COMMA AMPERSEND IDENTIFIER CLOSE_PARENTHESES SEMICOLON
-    | IF  { add('K'); } OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY else
-    | FOR  { add('K'); } OPEN_PARENTHESES statement SEMICOLON condition SEMICOLON statement CLOSE_PARENTHESES OPEN_CURLY body CLOSE_CURLY 
-    | RETURN { add('K'); } value SEMICOLON  // Fix: Ensure RETURN IS Seperated
-    | statement SEMICOLON
+body: code_list
     ;
 
-
-
-else: ELSE  { add('K'); } OPEN_CURLY body CLOSE_CURLY
-    | /* empty */
-    ;
-
-statement: datatype IDENTIFIER init { insert_type(); add('V'); }
-         | IDENTIFIER ASSIGN expression
-         | IDENTIFIER relation_op expression
-         | IDENTIFIER UNARY
-         | UNARY IDENTIFIER
+code_list: code_list code
+         | 
          ;
 
 
+code : PRINTF OPEN_PARENTHESES STRING printf_param CLOSE_PARENTHESES SEMICOLON
+      | IF OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY else
+      | FOR OPEN_PARENTHESES for_initialization SEMICOLON condition SEMICOLON inc_dec CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
+      | WHILE OPEN_PARENTHESES condition CLOSE_PARENTHESES OPEN_CURLY code_list CLOSE_CURLY
+      | DO OPEN_CURLY code_list CLOSE_CURLY WHILE OPEN_PARENTHESES condition CLOSE_PARENTHESES SEMICOLON
+      | SWITCH OPEN_PARENTHESES IDENTIFIER { checkDeclaration($3.name); } CLOSE_PARENTHESES OPEN_CURLY switch_body switch_default CLOSE_CURLY
+      | statement SEMICOLON
+      ;
 
-init: ASSIGN value
-    | /* empty */
-    ;
-
-condition: value relation_op value
-         | TRUE { add('K'); }
-         | FALSE { add('K'); }
-         | /* empty */
-         ;
-
-expression: value
-          | expression arithmetic_op value  // Right recursion for better parsing
-          ;
-
-arithmetic_op: ADD  
-             | SUBTRACT
-             | MULTIPLY
-             | DIVIDE
+printf_param : COMMA IDENTIFIER printf_param { checkDeclaration($2.name); }
+             |
              ;
 
-relation_op: LT
+for_initialization : datatype IDENTIFIER {addSymbol('V'); } init
+                    | IDENTIFIER { checkDeclaration($1.name); } init
+                    ;
+
+switch_body : CASE value COLON code_list break switch_body
+            | 
+            ;
+
+break : BREAK SEMICOLON
+      | 
+      ;
+
+switch_default : DEFAULT COLON code_list break
+                |
+                ;
+
+inc_dec : IDENTIFIER { checkDeclaration($1.name); } UNARY
+        | UNARY IDENTIFIER { checkDeclaration($2.name); }
+        ;
+
+statement : datatype IDENTIFIER {addSymbol('V'); } init 
+          | IDENTIFIER { checkDeclaration($1.name); } ASSIGN expression 
+          | IDENTIFIER { checkDeclaration($1.name); } UNARY
+          | UNARY IDENTIFIER { checkDeclaration($2.name); }
+          | IDENTIFIER { checkDeclaration($1.name); } relation_op expression
+          ;
+
+init: ASSIGN value
+    | 
+    ;
+
+else : ELSE  OPEN_CURLY code_list CLOSE_CURLY
+     |
+     ; 
+
+condition : value relation_op value 
+          | IDENTIFIER relation_op value { checkDeclaration($1.name); }
+          | value relation_op IDENTIFIER { checkDeclaration($3.name); }
+          | IDENTIFIER relation_op IDENTIFIER { checkDeclaration($1.name); checkDeclaration($3.name); }
+          | TRUE  
+          | FALSE  
+          ;
+
+expression : value arithmetic_op expression
+           | IDENTIFIER { checkDeclaration($1.name); } arithmetic_op expression
+           | value
+           | IDENTIFIER { checkDeclaration($1.name); }
+           ;
+
+return_stmt : RETURN value SEMICOLON { checkReturnType($2.name, $2.type); }
+            |
+            ;
+
+value : NUMBER  { strcpy($$.name, $1.name); sprintf($$.type, "int"); addSymbol('C'); }
+      | FLOAT_NUM  { strcpy($$.name, $1.name); sprintf($$.type, "float"); addSymbol('C'); }
+      | CHARACTER  { strcpy($$.name, $1.name); sprintf($$.type, "char"); addSymbol('C'); }
+      ;
+
+arithmetic_op : ADD
+              | SUBTRACT
+              | MULTIPLY
+              | DIVIDE
+              ;
+
+relation_op : LT
             | GT
             | LE
             | GE
             | EQ
             | NE
             ;
-
-
-return_stmt: RETURN  { add('K'); }  value SEMICOLON ;
-
-       ;
 %%
 
 int main() {
 
-    yyin = fopen("input.txt", "r");
+    yyin = fopen("input.c", "r");
     if (!yyin) {
         perror("Error opening file");
         return 1;
     }
 
-
     yyparse();
+    printf("\n\n\t\t\tTokens : \n\n");
+    printTokens();
     printST();
+    printf("\n\n\t\t\tSEMANTIC ANALYSIS\n\n");
+    if(errorCount > 0){
+        printf("\n\nSemantic analysis completed with %d errors\n", errorCount);
+        for(int i=0; i<errorCount; i++){
+			printf(" - %s", errors[i]);
+		}
+    }else{
+        printf("\nSemantic analysis completed with no errors");
+    }
+ 
     fclose(yyin);
     return 0;
 }
 
-
-void add(char c) {
-
-    struct symbolTableEntry *n = (struct symbolTableEntry *)malloc(sizeof(struct symbolTableEntry));
-
-    if (c == 'H') {
-        n->identifierName = strdup(yytext);
-        n->identifierType = strdup("header");
-        n->lineNumber = count; // Assuming countn is a placeholder
-        count++;
-    }
-    else if (c == 'K') {
-        n->identifierName = strdup(yytext);
-        n->identifierType = strdup("N/A");
-        n->lineNumber = count; // Assuming countn is a placeholder
-    
-        count++;
-    }
-    else if (c == 'V') {
-
-        n->identifierName = strdup(yytext);
-        n->identifierType = strdup(type);
-        n->lineNumber = count; // Assuming countn is a placeholder
-
-        count++;
-    }
-    else if (c == 'C') {
-
-        n->identifierName = strdup(yytext);
-        n->identifierType = strdup("CONST");
-        n->lineNumber = count; // Assuming countn is a placeholder
-       
-        count++;
-    }
-    else if (c == 'F') {
-
-        n->identifierName = strdup(yytext);
-        n->identifierType = strdup(type);
-        n->lineNumber = count; // Assuming countn is a placeholder
-        
-        count++;
-    }
-
-    n->next = symbolTable;
-    symbolTable = n;
+void insertDataType(){
+    strcpy(type, yytext);
 }
 
+int searchSymbol(char *var){
+    struct symbolTableEntry *n = symbolTable;
+
+    while(n != NULL){
+        if(strcmp(n->identifierName , var) == 0){
+            return 1;
+        }
+
+        n = n->next;
+    }
+
+    return 0;
+}
+
+void addSymbol(char c){
+
+    if(!searchSymbol(yytext)){
+        struct symbolTableEntry *n = (struct symbolTableEntry *)malloc(sizeof(struct symbolTableEntry));
+
+        if(c == 'H'){
+            n->identifierName = strdup(yytext);
+            n->identifierType = strdup("header");
+            n->dataType = strdup("N/A");
+            n->lineNum  = lineNumber;
+        }else if(c == 'K'){
+            n->identifierName = strdup(yytext);
+            n->identifierType = strdup("keyword");
+            n->dataType = strdup("N/A");
+            n->lineNum  = lineNumber;
+        }else if(c == 'V'){
+            n->identifierName = strdup(yytext);
+            n->identifierType = strdup("variable");
+            n->dataType = strdup(type);
+            n->lineNum  = lineNumber;
+        }else if(c == 'C'){
+            n->identifierName = strdup(yytext);
+            n->identifierType = strdup("constant");
+            n->dataType = strdup("const");
+            n->lineNum  = lineNumber;
+        }else if(c == 'F'){
+            n->identifierName = strdup(yytext);
+            n->identifierType = strdup("function");
+            n->dataType = strdup(type);
+            n->lineNum  = lineNumber;
+        }
+
+        n->next = symbolTable;
+        symbolTable = n;
+    }
+}
 
 void printST() {
     struct symbolTableEntry *temp = symbolTable;
@@ -185,27 +259,58 @@ void printST() {
     }
 
     // Print table header
-    printf("\nPHASE 1: LEXICAL ANALYSIS \n\n");
-    printf("+----------------------+----------------------+--------------+\n");
-    printf("| %-20s | %-20s | %-12s |\n", "SYMBOL", "DATATYPE", "LINE NUMBER");
-    printf("+----------------------+----------------------+--------------+\n");
+    printf("\n\t\t\t\tSymbol Table\n\n");
+    
+    printf("+----------------------+----------------------+----------------------+--------------+\n");
+    printf("| %-20s | %-20s | %-20s | %-12s |\n", "SYMBOL","TYPE", "DATATYPE", "LINE NUMBER");
+    printf("+----------------------+----------------------+----------------------+--------------+\n");
 
     // Print table contents
     while (temp != NULL) {
-        printf("| %-20s | %-20s | %-12d |\n", temp->identifierName, temp->identifierType, temp->lineNumber);
+        printf("| %-20s | %-20s | %-20s | %-12d |\n", temp->identifierName,temp->identifierType, temp->dataType, temp->lineNum);
         temp = temp->next;
     }
 
     // Print table footer
-    printf("+----------------------+----------------------+--------------+\n");
+    printf("+----------------------+----------------------+----------------------+--------------+\n");
 }
 
+void checkDeclaration(char *var){
+    if(!searchSymbol(var)){
+        sprintf(errors[errorCount++], "Line %d. Variable %s not declared before usage.\n", lineNumber, var);
+    }
+}
 
+void checkReturnType(char *val, char *type){
+    char *mainDataType = getDataType("main");
+    char *returnDataType = getDataType(val);
+    
+    if(!strcmp(mainDataType, "void")){
+        sprintf(errors[errorCount++], "Line %d. Return with a value, in function returning void.\n", lineNumber);
+        return;
+    }
+    
+    if(!strcmp(mainDataType, type)){
+        return;
+    }else{
+        sprintf(errors[errorCount++], "Line %d. Return type mismatch.\n", lineNumber);
+    }
+}
 
-void insert_type() {
-    strcpy(type, yytext);
+ 
+
+char *getDataType(char *var){
+    struct symbolTableEntry *n = symbolTable;
+    while(n != NULL){
+        if(!strcmp(n->identifierName, var)){
+            return n->dataType;
+        }
+        n = n->next;
+    }
+
+    return "undefined";
 }
 
 void yyerror(const char* msg) {
-    fprintf(stderr, "%s\n", msg);
+    fprintf(stderr, "Error at line %d: %s\n", lineNumber, msg);
 }

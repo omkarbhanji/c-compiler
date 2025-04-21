@@ -39,11 +39,11 @@
    /* Put the tokens into the symbol table, so that GDB and other debuggers
       know about them.  */
    enum yytokentype {
-     MAIN = 258,
-     INT = 259,
-     FLOAT = 260,
-     CHAR = 261,
-     VOID = 262,
+     VOID = 258,
+     MAIN = 259,
+     INT = 260,
+     FLOAT = 261,
+     CHAR = 262,
      RETURN = 263,
      INCLUDE = 264,
      OPEN_PARENTHESES = 265,
@@ -51,41 +51,70 @@
      OPEN_CURLY = 267,
      CLOSE_CURLY = 268,
      SEMICOLON = 269,
-     NUMBER = 270,
-     FLOAT_NUM = 271,
-     CHARACTER = 272,
-     STRING = 273,
-     PRINTF = 274,
-     COMMA = 275,
-     AMPERSEND = 276,
-     SCANF = 277,
-     IF = 278,
-     ELSE = 279,
-     FOR = 280,
-     IDENTIFIER = 281,
-     ASSIGN = 282,
-     LE = 283,
-     GE = 284,
-     EQ = 285,
-     NE = 286,
-     LT = 287,
-     GT = 288,
-     AND = 289,
-     OR = 290,
-     ADD = 291,
-     SUBTRACT = 292,
-     MULTIPLY = 293,
-     DIVIDE = 294,
-     TRUE = 295,
-     FALSE = 296,
-     UNARY = 297
+     COLON = 270,
+     NUMBER = 271,
+     FLOAT_NUM = 272,
+     CHARACTER = 273,
+     STRING = 274,
+     PRINTF = 275,
+     COMMA = 276,
+     AMPERSEND = 277,
+     SCANF = 278,
+     IF = 279,
+     ELSE = 280,
+     FOR = 281,
+     DO = 282,
+     WHILE = 283,
+     SWITCH = 284,
+     CASE = 285,
+     BREAK = 286,
+     DEFAULT = 287,
+     IDENTIFIER = 288,
+     ASSIGN = 289,
+     LE = 290,
+     GE = 291,
+     EQ = 292,
+     NE = 293,
+     LT = 294,
+     GT = 295,
+     AND = 296,
+     OR = 297,
+     ADD = 298,
+     SUBTRACT = 299,
+     MULTIPLY = 300,
+     DIVIDE = 301,
+     TRUE = 302,
+     FALSE = 303,
+     UNARY = 304,
+     LINE = 305
    };
 #endif
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef int YYSTYPE;
+typedef union YYSTYPE
+{
+
+/* Line 1676 of yacc.c  */
+#line 42 "parser.y"
+
+    struct varName{
+        char name[50];
+        struct node *nd;
+    }ndObj;
+
+    struct varName2{
+        char name[50];
+        struct node *nd;
+        char type[5];
+    }ndObj2;
+
+
+
+/* Line 1676 of yacc.c  */
+#line 117 "parser.tab.h"
+} YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
